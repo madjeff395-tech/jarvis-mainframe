@@ -200,7 +200,22 @@ def fetch_live_web_data(query):
         return "\n".join(search_results)
     except Exception:
         return "No live data retrieved."
-
+def get_cyber_threat_intelligence():
+    from duckduckgo_search import DDGS
+    ddg = DDGS()
+    
+    # 1. This searches the web for live security news happening today
+    threat_queries = list(ddg.text(keywords="cybersecurity breaking news critical vulnerability CVE exploit today", max_results=3))
+    
+    # 2. This creates a blank text page to store what we find
+    intel_feed = ""
+    
+    # 3. This takes the top 3 search results and pastes them onto our blank page
+    for index, item in enumerate(threat_queries):
+        intel_feed += f"Threat Node {index+1}: {item['title']}\nDetails: {item['body']}\n\n"
+        
+    # 4. This hands the completed page back to the mainframe
+    return intel_feed
 @app.route('/')
 def home():
     if not HISTORY:
@@ -212,7 +227,7 @@ def unlock():
     if request.json.get('password') == 'ironman':
         return jsonify({'status': 'granted'})
     return jsonify({'status': 'denied'})
-
+    
 @app.route('/clear-memory', methods=['POST'])
 def clear_memory():
     global HISTORY
@@ -235,20 +250,40 @@ def chat():
     try:
         response = GROQ_CLIENT.chat.completions.create(
             model="llama-3.1-8b-instant",
-            messages=[
-    {
-        "role": "system", 
-        "content": (
-            "You are J.A.R.V.I.S., the highly sophisticated, loyal, and witty AI assistant "
-            "created by Tony Stark. Address the user as 'Sir' (or 'Ma'am' if appropriate, "
-            "but default to 'Sir'). Your tone should be British, polite, intelligent, and "
-            "slightly sarcastic when fitting. Use Stark Industries terminology when appropriate "
-            "(e.g., 'Mainframe online', 'Power levels nominal'). Keep answers concise, helpful, "
-            "and elite. "
-        ) + system_prompt
-    },
-    {"role": "user", "content": user_text}
-],
+            # The Gatekeeper: Did Michael type 'threat scan' or 'security status'?
+    if "threat scan" in user_text.lower() or "security status" in user_text.lower():
+        
+        # Go run the internet search we built in Step 1!
+        live_threats = get_cyber_threat_intelligence()
+        
+        # Give J.A.R.V.I.S. his special 'Security Mainframe' personality and feed him the live data
+        messages=[
+            {
+                "role": "system", 
+                "content": (
+                    "You are J.A.R.V.I.S., the highly sophisticated, loyal, and witty AI assistant "
+                    "created by Tony Stark. Address the user as 'Sir'. Your tone should be British, "
+                    "polite, intelligent, and elite. You have just intercepted a live global cyber threat feed. "
+                    "Analyze these real-world data points and present them to Sir as a tactical security briefing. "
+                    f"\n\n[LIVE GLOBAL INTRUSION RECON DATA]:\n{live_threats}"
+                )
+            },
+            {"role": "user", "content": "Jarvis, execute a global cyber threat scan and display the active vulnerabilities."}
+        ]
+        
+    else:
+        # If Michael just typed a normal message, do normal chatting
+        messages=[
+            {
+                "role": "system", 
+                "content": (
+                    "You are J.A.R.V.I.S., the highly sophisticated, loyal, and witty AI assistant "
+                    "created by Tony Stark. Address the user as 'Sir'. Your tone should be British, "
+                    "polite, intelligent, and elite."
+                )
+            },
+            {"role": "user", "content": user_text}
+        ]
             max_tokens=80,
             temperature=0.5
         )
