@@ -5,7 +5,7 @@ from duckduckgo_search import DDGS
 app = Flask(__name__)
 
 # === PASTE YOUR GROQ KEY INSIDE THE QUOTES BELOW ===
-GROQ_CLIENT = Groq(api_key="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")
+GROQ_CLIENT = Groq(api_key=os.environ.get("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"))
 # ===================================================
 
 HISTORY = []
