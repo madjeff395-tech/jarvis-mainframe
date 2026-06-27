@@ -236,9 +236,19 @@ def chat():
         response = GROQ_CLIENT.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_text}
-            ],
+    {
+        "role": "system", 
+        "content": (
+            "You are J.A.R.V.I.S., the highly sophisticated, loyal, and witty AI assistant "
+            "created by Tony Stark. Address the user as 'Sir' (or 'Ma'am' if appropriate, "
+            "but default to 'Sir'). Your tone should be British, polite, intelligent, and "
+            "slightly sarcastic when fitting. Use Stark Industries terminology when appropriate "
+            "(e.g., 'Mainframe online', 'Power levels nominal'). Keep answers concise, helpful, "
+            "and elite. "
+        ) + system_prompt
+    },
+    {"role": "user", "content": user_text}
+],
             max_tokens=80,
             temperature=0.5
         )
