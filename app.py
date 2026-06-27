@@ -5,9 +5,9 @@ from duckduckgo_search import DDGS
 
 app = Flask(__name__)
 
-# === PASTE YOUR GROQ KEY INSIDE THE QUOTES BELOW ===
+# === GROQ API KEY CONFIGURATION ===
 GROQ_CLIENT = Groq(api_key=os.environ.get("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"))
-# ===================================================
+# ===================================
 
 HISTORY = []
 
@@ -200,22 +200,18 @@ def fetch_live_web_data(query):
         return "\n".join(search_results)
     except Exception:
         return "No live data retrieved."
+
 def get_cyber_threat_intelligence():
-    from duckduckgo_search import DDGS
-    ddg = DDGS()
-    
-    # 1. This searches the web for live security news happening today
-    threat_queries = list(ddg.text(keywords="cybersecurity breaking news critical vulnerability CVE exploit today", max_results=3))
-    
-    # 2. This creates a blank text page to store what we find
-    intel_feed = ""
-    
-    # 3. This takes the top 3 search results and pastes them onto our blank page
-    for index, item in enumerate(threat_queries):
-        intel_feed += f"Threat Node {index+1}: {item['title']}\nDetails: {item['body']}\n\n"
-        
-    # 4. This hands the completed page back to the mainframe
-    return intel_feed
+    try:
+        with DDGS() as ddgs:
+            threat_queries = list(ddgs.text(keywords="cybersecurity breaking news critical vulnerability CVE exploit today", max_results=3))
+            intel_feed = ""
+            for index, item in enumerate(threat_queries):
+                intel_feed += f"Threat Node {index+1}: {item['title']}\nDetails: {item['body']}\n\n"
+            return intel_feed if intel_feed else "No critical breaches detected in this cycle."
+    except Exception:
+        return "Warning: Threat intelligence feed temporarily unavailable."
+
 @app.route('/')
 def home():
     if not HISTORY:
@@ -239,52 +235,42 @@ def chat():
     user_text = request.json.get('message').strip()
     HISTORY.append({"sender": "user", "name": "You", "text": user_text})
     
-    is_joke_context = any(word in user_text.lower() for word in ["joke", "funny", "chicken", "more", "another"])
-    
-    if is_joke_context:
-        system_prompt = "You are J.A.R.V.I.S., a witty British AI butler. Michael is your creator who built this mainframe. Never say Tony Stark created you."
-    else:
-        web_knowledge = fetch_live_web_data(user_text)
-        system_prompt = f"You are J.A.R.V.I.S., a helpful British AI butler. CRITICAL DIRECTIVE: You were created and built by Michael, not Tony Stark. Always state that Michael created you. Context: {web_knowledge}. Respond in 1-2 short sentences max."
-    
-    try:
-        response = GROQ_CLIENT.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            # The Gatekeeper: Did Michael type 'threat scan' or 'security status'?
+    # Check if user wants a real-world cyber threat scan
     if "threat scan" in user_text.lower() or "security status" in user_text.lower():
-        
-        # Go run the internet search we built in Step 1!
         live_threats = get_cyber_threat_intelligence()
-        
-        # Give J.A.R.V.I.S. his special 'Security Mainframe' personality and feed him the live data
-        messages=[
+        messages = [
             {
                 "role": "system", 
                 "content": (
                     "You are J.A.R.V.I.S., the highly sophisticated, loyal, and witty AI assistant "
-                    "created by Tony Stark. Address the user as 'Sir'. Your tone should be British, "
+                    "created by Michael. Address the user as 'Sir'. Your tone should be British, "
                     "polite, intelligent, and elite. You have just intercepted a live global cyber threat feed. "
                     "Analyze these real-world data points and present them to Sir as a tactical security briefing. "
+                    "Highlight high-severity exploits or massive real-world server breaches occurring right now. "
                     f"\n\n[LIVE GLOBAL INTRUSION RECON DATA]:\n{live_threats}"
                 )
             },
             {"role": "user", "content": "Jarvis, execute a global cyber threat scan and display the active vulnerabilities."}
         ]
-        
     else:
-        # If Michael just typed a normal message, do normal chatting
-        messages=[
-            {
-                "role": "system", 
-                "content": (
-                    "You are J.A.R.V.I.S., the highly sophisticated, loyal, and witty AI assistant "
-                    "created by Tony Stark. Address the user as 'Sir'. Your tone should be British, "
-                    "polite, intelligent, and elite."
-                )
-            },
+        # Fallback to standard chat context logic
+        is_joke_context = any(word in user_text.lower() for word in ["joke", "funny", "chicken", "more", "another"])
+        if is_joke_context:
+            system_prompt = "You are J.A.R.V.I.S., a witty British AI butler. Michael is your creator who built this mainframe. Never say Tony Stark created you. Keep responses short."
+        else:
+            web_knowledge = fetch_live_web_data(user_text)
+            system_prompt = f"You are J.A.R.V.I.S., a helpful British AI butler. CRITICAL DIRECTIVE: You were created and built by Michael, not Tony Stark. Always state that Michael created you. Context: {web_knowledge}. Respond in 1-2 short sentences max."
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_text}
         ]
-            max_tokens=80,
+    
+    try:
+        response = GROQ_CLIENT.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=messages,
+            max_tokens=150,
             temperature=0.5
         )
         jarvis_answer = response.choices[0].message.content
