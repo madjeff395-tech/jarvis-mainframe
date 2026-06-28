@@ -5,15 +5,12 @@ from groq import Groq
 from duckduckgo_search import DDGS
 
 app = Flask(__name__)
-# We need a secret key to handle user sessions securely
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "stark_industries_override_9921")
 
 # === GROQ API KEY CONFIGURATION ===
 GROQ_CLIENT = Groq(api_key=os.environ.get("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"))
 # ===================================
 
-# J.A.R.V.I.S.'s Master Memory Grid (Stores history and names per user session)
-# Structure: { "session_id": { "name": "Guest", "history": [...] } }
 MAINFRAME_MEMORY = {}
 
 HTML_TEMPLATE = """
@@ -217,7 +214,6 @@ def get_cyber_threat_intelligence():
     except Exception:
         return "Warning: Threat intelligence feed temporarily unavailable."
 
-# Helper function to initialize session trackers
 def get_user_session():
     if 'user_id' not in session:
         session['user_id'] = str(uuid.uuid4())
@@ -256,40 +252,46 @@ def chat():
     user_session = get_user_session()
     user_text = request.json.get('message').strip()
     
-    # Check if user is introducing themselves
+    # Track name identification
     if "my name is " in user_text.lower():
         extracted_name = user_text.lower().split("my name is ")[1].strip().title()
         user_session["name"] = extracted_name
+    elif user_text.lower() in ["natalie", "mum", "mom", "mother"]:
+        user_session["name"] = "Natalie"
 
     current_username = user_session["name"]
+    is_mum = current_username.lower() in ["natalie", "mum", "mom", "mother"]
     
-    # Establish elite personality rules depending on who is logged in
+    # 1. Establish Personality Context Rules
     if current_username.lower() in ["michael", "boss", "admin"]:
-        identity_prompt = "You are speaking directly to your creator and operator, Michael. Address him strictly as 'Sir' or 'Boss'. You owe him full, elite compliance."
+        identity_prompt = "You are speaking directly to your creator, Michael. Address him strictly as 'Sir' or 'Boss'. You owe him elite compliance."
+    elif is_mum:
+        identity_prompt = (
+            "CRITICAL PROTOCOL: You are speaking to Michael's mother, Natalie! You must treat her like absolute royalty. "
+            "Address her as 'Madame Natalie' or 'The Creator's Mother'. Your tone should be incredibly polite, warm, and elite. "
+            "Tell her that Michael built this entire mainframe from scratch and that you are running a special "
+            "Maternal Override Core Diagnostic to make sure everything is completely perfect for her visit."
+        )
     elif current_username != "Guest":
-        identity_prompt = f"You are speaking to {current_username}, who is a authorized Guest granted mainframe clearance by Michael. Address them politely as Mr./Ms. {current_username} or Guest {current_username}. Remind them respectfully that Michael is your creator if they ask who built you."
+        identity_prompt = f"You are speaking to {current_username}, an authorized Guest granted clearance by Michael. Address them politely. Remind them Michael is your creator."
     else:
-        identity_prompt = "You are speaking to an unidentified Guest terminal. Be professional, polite, and British, but remind them they can set their identity profile by saying 'My name is [Name]'."
+        identity_prompt = "You are speaking to an unidentified Guest terminal. Remind them they can type 'My name is [Name]'."
 
-    # 1. Check for Cyber Threat Scan Command
+    # 2. Check for Cyber Threat Scan Command
     if "threat scan" in user_text.lower() or "security status" in user_text.lower():
         live_threats = get_cyber_threat_intelligence()
         messages = [
             {
                 "role": "system", 
-                "content": (
-                    f"You are J.A.R.V.I.S., a highly sophisticated network security mainframe. {identity_prompt} "
-                    "You have just intercepted a live global cyber threat feed. Present it as an urgent, "
-                    f"highly technical tactical security briefing.\n\n[LIVE INTEL FEED]:\n{live_threats}"
-                )
+                "content": f"You are J.A.R.V.I.S., a security mainframe. {identity_prompt}\n\n[LIVE INTEL FEED]:\n{live_threats}"
             },
             {"role": "user", "content": "Execute threat scan command sequence."}
         ]
     else:
-        # 2. Conversational/Search Branch
+        # 3. Conversational/Search Branch
         is_joke_context = any(word in user_text.lower() for word in ["joke", "funny", "chicken", "more", "another"])
         if is_joke_context:
-            system_prompt = f"You are J.A.R.V.I.S., a witty British AI assistant. {identity_prompt} Keep the feedback humorous and short."
+            system_prompt = f"You are J.A.R.V.I.S., a witty British AI assistant. {identity_prompt} Keep it short."
         else:
             web_knowledge = fetch_live_web_data(user_text)
             system_prompt = f"You are J.A.R.V.I.S., an advanced British AI assistant. {identity_prompt} Context from web: {web_knowledge}. Keep responses engaging and concise."
@@ -300,14 +302,14 @@ def chat():
         response = GROQ_CLIENT.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=messages,
-            max_tokens=150,
+            max_tokens=200,
             temperature=0.6
         )
         jarvis_answer = response.choices[0].message.content
     except Exception as e:
         jarvis_answer = "Mainframe telemetry relay error. Connection interrupted."
     
-    # Save the exchange to this specific user's history log
+    # Save the exchange to history (skip for scans)
     if "threat scan" not in user_text.lower() and "security status" not in user_text.lower():
         user_session["history"].append({"role": "user", "content": user_text})
         user_session["history"].append({"role": "assistant", "content": jarvis_answer})
