@@ -260,7 +260,8 @@ def chat():
         user_session["name"] = "Natalie"
 
     current_username = user_session["name"]
-    is_mum = current_username.lower() in ["natalie", "mum", "mom", "mother"]
+    is_mum = current_username.lower() in ["natalie", "mum", "keeley", "mother"]
+    is_brother = current_username.lower() in ["brandon", "brother"]
     
     # 1. Establish Personality Context Rules
     if current_username.lower() in ["michael", "boss", "admin"]:
