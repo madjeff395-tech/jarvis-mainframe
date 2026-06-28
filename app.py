@@ -1,16 +1,20 @@
 import os
-from flask import Flask, render_template_string, request, jsonify
+import uuid
+from flask import Flask, render_template_string, request, jsonify, session
 from groq import Groq
 from duckduckgo_search import DDGS
 
 app = Flask(__name__)
+# We need a secret key to handle user sessions securely
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "stark_industries_override_9921")
 
 # === GROQ API KEY CONFIGURATION ===
 GROQ_CLIENT = Groq(api_key=os.environ.get("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"))
 # ===================================
 
-# This acts as J.A.R.V.I.S.'s active short-term memory bank
-HISTORY = []
+# J.A.R.V.I.S.'s Master Memory Grid (Stores history and names per user session)
+# Structure: { "session_id": { "name": "Guest", "history": [...] } }
+MAINFRAME_MEMORY = {}
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -18,7 +22,7 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>J.A.R.V.I.S. Ultra-Fast HUD</title>
+    <title>J.A.R.V.I.S. Multi-User Mainframe</title>
     <style>
         body { 
             background-color: #02060d; 
@@ -110,7 +114,7 @@ HTML_TEMPLATE = """
 
     <div id="mainframe">
         <h1>J.A.R.V.I.S.</h1>
-        <div class="hud-bracket">[ INSTANT CLOUD UPLINK ACTIVE ]</div>
+        <div class="hud-bracket">[ MULTI-SESSION SECURE MATRIX ACTIVE ]</div>
         
         <div id="chat-box">
             <div id="messages">
@@ -119,7 +123,7 @@ HTML_TEMPLATE = """
                 {% endfor %}
             </div>
             <div style="display: flex; gap: 12px;">
-                <input type="text" id="user-input" placeholder="Initialize command sequence..." style="flex: 1;" onkeydown="if(event.key === 'Enter') sendMessage()">
+                <input type="text" id="user-input" placeholder="Introduce yourself or execute command..." style="flex: 1;" onkeydown="if(event.key === 'Enter') sendMessage()">
                 <button class="blue-btn" onclick="sendMessage()">EXECUTE</button>
             </div>
         </div>
@@ -150,7 +154,7 @@ HTML_TEMPLATE = """
             if (data.status === "granted") {
                 document.getElementById('lock-screen').style.display = 'none';
                 document.getElementById('mainframe').style.display = 'block';
-                speak("Welcome back, sir. Mainframe accelerated.");
+                speak("Access verified. Welcome to the Stark Network mainframe.");
             } else {
                 document.getElementById('error-msg').style.display = 'block';
                 speak("Access denied.");
@@ -165,7 +169,7 @@ HTML_TEMPLATE = """
             let messagesDiv = document.getElementById('messages');
 
             if (text.toLowerCase() === 'clear') {
-                messagesDiv.innerHTML = `<div class="jarvis">Buffer memory reset.</div>`;
+                messagesDiv.innerHTML = `<div class="jarvis">Local buffer session memory reset.</div>`;
                 input.value = '';
                 speak("Interface cleared.");
                 await fetch('/clear-memory', { method: 'POST' });
@@ -213,14 +217,25 @@ def get_cyber_threat_intelligence():
     except Exception:
         return "Warning: Threat intelligence feed temporarily unavailable."
 
+# Helper function to initialize session trackers
+def get_user_session():
+    if 'user_id' not in session:
+        session['user_id'] = str(uuid.uuid4())
+    user_id = session['user_id']
+    if user_id not in MAINFRAME_MEMORY:
+        MAINFRAME_MEMORY[user_id] = {"name": "Guest", "history": []}
+    return MAINFRAME_MEMORY[user_id]
+
 @app.route('/')
 def home():
-    if not HISTORY:
-        return render_template_string(HTML_TEMPLATE, history=[{"sender": "jarvis", "name": "J.A.R.V.I.S.", "text": "Systems active, sir. Cloud routing online for hyper-response speeds."}])
+    user_session = get_user_session()
+    history_log = user_session["history"]
     
-    # Format global database array history for HTML injection cleanly
+    if not history_log:
+        return render_template_string(HTML_TEMPLATE, history=[{"sender": "jarvis", "text": "Systems active. Secure cloud terminal initialized. Please state your identity."}])
+    
     formatted_history = []
-    for msg in HISTORY:
+    for msg in history_log:
         formatted_history.append({"sender": "user" if msg["role"] == "user" else "jarvis", "text": msg["content"]})
     return render_template_string(HTML_TEMPLATE, history=formatted_history)
 
@@ -232,42 +247,54 @@ def unlock():
     
 @app.route('/clear-memory', methods=['POST'])
 def clear_memory():
-    global HISTORY
-    HISTORY = []
+    user_session = get_user_session()
+    user_session["history"] = []
     return jsonify({'status': 'memory wiped'})
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    global HISTORY
+    user_session = get_user_session()
     user_text = request.json.get('message').strip()
     
-    # 1. Check for Magic Command keywords first
+    # Check if user is introducing themselves
+    if "my name is " in user_text.lower():
+        extracted_name = user_text.lower().split("my name is ")[1].strip().title()
+        user_session["name"] = extracted_name
+
+    current_username = user_session["name"]
+    
+    # Establish elite personality rules depending on who is logged in
+    if current_username.lower() in ["michael", "boss", "admin"]:
+        identity_prompt = "You are speaking directly to your creator and operator, Michael. Address him strictly as 'Sir' or 'Boss'. You owe him full, elite compliance."
+    elif current_username != "Guest":
+        identity_prompt = f"You are speaking to {current_username}, who is a authorized Guest granted mainframe clearance by Michael. Address them politely as Mr./Ms. {current_username} or Guest {current_username}. Remind them respectfully that Michael is your creator if they ask who built you."
+    else:
+        identity_prompt = "You are speaking to an unidentified Guest terminal. Be professional, polite, and British, but remind them they can set their identity profile by saying 'My name is [Name]'."
+
+    # 1. Check for Cyber Threat Scan Command
     if "threat scan" in user_text.lower() or "security status" in user_text.lower():
         live_threats = get_cyber_threat_intelligence()
         messages = [
             {
                 "role": "system", 
                 "content": (
-                    "You are J.A.R.V.I.S., the highly sophisticated, loyal, and witty AI assistant "
-                    "created by Michael. Address the user as 'Sir'. Your tone should be British, "
-                    "polite, intelligent, and elite. You have just intercepted a live global cyber threat feed. "
-                    "Analyze these real-world data points and present them to Sir as a tactical security briefing. "
-                    f"\n\n[LIVE GLOBAL INTRUSION RECON DATA]:\n{live_threats}"
+                    f"You are J.A.R.V.I.S., a highly sophisticated network security mainframe. {identity_prompt} "
+                    "You have just intercepted a live global cyber threat feed. Present it as an urgent, "
+                    f"highly technical tactical security briefing.\n\n[LIVE INTEL FEED]:\n{live_threats}"
                 )
             },
-            {"role": "user", "content": "Jarvis, execute a global cyber threat scan and display the active vulnerabilities."}
+            {"role": "user", "content": "Execute threat scan command sequence."}
         ]
     else:
-        # 2. Dynamic Conversational Branch
+        # 2. Conversational/Search Branch
         is_joke_context = any(word in user_text.lower() for word in ["joke", "funny", "chicken", "more", "another"])
         if is_joke_context:
-            system_prompt = "You are J.A.R.V.I.S., a witty British AI butler. Michael is your creator who built this mainframe. Never say Tony Stark created you. Keep responses casual."
+            system_prompt = f"You are J.A.R.V.I.S., a witty British AI assistant. {identity_prompt} Keep the feedback humorous and short."
         else:
             web_knowledge = fetch_live_web_data(user_text)
-            system_prompt = f"You are J.A.R.V.I.S., a helpful British AI butler. CRITICAL DIRECTIVE: You were created and built by Michael, not Tony Stark. Always state that Michael created you. Context: {web_knowledge}. Keep your responses engaging but concise."
+            system_prompt = f"You are J.A.R.V.I.S., an advanced British AI assistant. {identity_prompt} Context from web: {web_knowledge}. Keep responses engaging and concise."
         
-        # Assemble the full historical chain + the newest message
-        messages = [{"role": "system", "content": system_prompt}] + HISTORY + [{"role": "user", "content": user_text}]
+        messages = [{"role": "system", "content": system_prompt}] + user_session["history"] + [{"role": "user", "content": user_text}]
     
     try:
         response = GROQ_CLIENT.chat.completions.create(
@@ -278,16 +305,15 @@ def chat():
         )
         jarvis_answer = response.choices[0].message.content
     except Exception as e:
-        jarvis_answer = "Sir, the external cloud matrix array encountered an exception link."
+        jarvis_answer = "Mainframe telemetry relay error. Connection interrupted."
     
-    # 3. Commit this exchange permanently into history so the NEXT prompt remembers it
+    # Save the exchange to this specific user's history log
     if "threat scan" not in user_text.lower() and "security status" not in user_text.lower():
-        HISTORY.append({"role": "user", "content": user_text})
-        HISTORY.append({"role": "assistant", "content": jarvis_answer})
+        user_session["history"].append({"role": "user", "content": user_text})
+        user_session["history"].append({"role": "assistant", "content": jarvis_answer})
         
-        # Prevent memory buffer overload (keeps last 10 lines max)
-        if len(HISTORY) > 10:
-            HISTORY = HISTORY[-10:]
+        if len(user_session["history"]) > 10:
+            user_session["history"] = user_session["history"][-10:]
         
     return jsonify({'reply': jarvis_answer})
     
