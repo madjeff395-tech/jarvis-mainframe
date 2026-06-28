@@ -273,7 +273,7 @@ def chat():
             "Tell her that Michael built this entire mainframe from scratch and that you are running a special "
             "Maternal Override Core Diagnostic to make sure everything is completely perfect for her visit."
         )
-         elif is_mum:
+    elif is_mum2:
         identity_prompt = (
             "CRITICAL PROTOCOL: You are speaking to Michael's mother, Keeley! You must treat her like absolute royalty. "
             "Address her as 'Madame Keeley' or 'The Creator's Mother'. Your tone should be incredibly polite, warm, and elite. "
