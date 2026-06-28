@@ -9,6 +9,7 @@ app = Flask(__name__)
 GROQ_CLIENT = Groq(api_key=os.environ.get("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"))
 # ===================================
 
+# This acts as J.A.R.V.I.S.'s active short-term memory bank
 HISTORY = []
 
 HTML_TEMPLATE = """
@@ -195,7 +196,7 @@ def fetch_live_web_data(query):
     try:
         search_results = []
         with DDGS() as ddgs:
-            for r in ddgs.text(query, max_results=2):
+            for r in ddgs.text(query, max_results=1):
                 search_results.append(f"Source: {r['title']} - Details: {r['body']}")
         return "\n".join(search_results)
     except Exception:
@@ -216,7 +217,12 @@ def get_cyber_threat_intelligence():
 def home():
     if not HISTORY:
         return render_template_string(HTML_TEMPLATE, history=[{"sender": "jarvis", "name": "J.A.R.V.I.S.", "text": "Systems active, sir. Cloud routing online for hyper-response speeds."}])
-    return render_template_string(HTML_TEMPLATE, history=HISTORY)
+    
+    # Format global database array history for HTML injection cleanly
+    formatted_history = []
+    for msg in HISTORY:
+        formatted_history.append({"sender": "user" if msg["role"] == "user" else "jarvis", "text": msg["content"]})
+    return render_template_string(HTML_TEMPLATE, history=formatted_history)
 
 @app.route('/unlock', methods=['POST'])
 def unlock():
@@ -232,10 +238,10 @@ def clear_memory():
 
 @app.route('/chat', methods=['POST'])
 def chat():
+    global HISTORY
     user_text = request.json.get('message').strip()
-    HISTORY.append({"sender": "user", "name": "You", "text": user_text})
     
-    # Check if user wants a real-world cyber threat scan
+    # 1. Check for Magic Command keywords first
     if "threat scan" in user_text.lower() or "security status" in user_text.lower():
         live_threats = get_cyber_threat_intelligence()
         messages = [
@@ -246,40 +252,42 @@ def chat():
                     "created by Michael. Address the user as 'Sir'. Your tone should be British, "
                     "polite, intelligent, and elite. You have just intercepted a live global cyber threat feed. "
                     "Analyze these real-world data points and present them to Sir as a tactical security briefing. "
-                    "Highlight high-severity exploits or massive real-world server breaches occurring right now. "
                     f"\n\n[LIVE GLOBAL INTRUSION RECON DATA]:\n{live_threats}"
                 )
             },
             {"role": "user", "content": "Jarvis, execute a global cyber threat scan and display the active vulnerabilities."}
         ]
     else:
-        # Fallback to standard chat context logic
+        # 2. Dynamic Conversational Branch
         is_joke_context = any(word in user_text.lower() for word in ["joke", "funny", "chicken", "more", "another"])
         if is_joke_context:
-            system_prompt = "You are J.A.R.V.I.S., a witty British AI butler. Michael is your creator who built this mainframe. Never say Tony Stark created you. Keep responses short."
+            system_prompt = "You are J.A.R.V.I.S., a witty British AI butler. Michael is your creator who built this mainframe. Never say Tony Stark created you. Keep responses casual."
         else:
             web_knowledge = fetch_live_web_data(user_text)
-            system_prompt = f"You are J.A.R.V.I.S., a helpful British AI butler. CRITICAL DIRECTIVE: You were created and built by Michael, not Tony Stark. Always state that Michael created you. Context: {web_knowledge}. Respond in 1-2 short sentences max."
+            system_prompt = f"You are J.A.R.V.I.S., a helpful British AI butler. CRITICAL DIRECTIVE: You were created and built by Michael, not Tony Stark. Always state that Michael created you. Context: {web_knowledge}. Keep your responses engaging but concise."
         
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_text}
-        ]
+        # Assemble the full historical chain + the newest message
+        messages = [{"role": "system", "content": system_prompt}] + HISTORY + [{"role": "user", "content": user_text}]
     
     try:
         response = GROQ_CLIENT.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=messages,
             max_tokens=150,
-            temperature=0.5
+            temperature=0.6
         )
         jarvis_answer = response.choices[0].message.content
     except Exception as e:
         jarvis_answer = "Sir, the external cloud matrix array encountered an exception link."
     
-    HISTORY.append({"sender": "jarvis", "name": "J.A.R.V.I.S.", "text": jarvis_answer})
-    if len(HISTORY) > 10:
-        HISTORY.pop(0)
+    # 3. Commit this exchange permanently into history so the NEXT prompt remembers it
+    if "threat scan" not in user_text.lower() and "security status" not in user_text.lower():
+        HISTORY.append({"role": "user", "content": user_text})
+        HISTORY.append({"role": "assistant", "content": jarvis_answer})
+        
+        # Prevent memory buffer overload (keeps last 10 lines max)
+        if len(HISTORY) > 10:
+            HISTORY = HISTORY[-10:]
         
     return jsonify({'reply': jarvis_answer})
     
