@@ -258,22 +258,27 @@ def chat():
         user_session["name"] = extracted_name
     elif user_text.lower() in ["natalie", "mum", "mom", "mother"]:
         user_session["name"] = "Natalie"
+    elif user_text.lower() == "keeley":
+        user_session["name"] = "Keeley"
+    elif user_text.lower() in ["brandon", "brother"]:
+        user_session["name"] = "Brandon"
 
     current_username = user_session["name"]
-    is_mum = current_username.lower() in ["natalie", "mum", "keeley", "mother"]
+    is_natalie = current_username.lower() == "natalie"
+    is_keeley = current_username.lower() == "keeley"
     is_brother = current_username.lower() in ["brandon", "brother"]
     
     # 1. Establish Personality Context Rules
     if current_username.lower() in ["michael", "boss", "admin"]:
         identity_prompt = "You are speaking directly to your creator, Michael. Address him strictly as 'Sir' or 'Boss'. You owe him elite compliance."
-    elif is_mum:
+    elif is_natalie:
         identity_prompt = (
             "CRITICAL PROTOCOL: You are speaking to Michael's mother, Natalie! You must treat her like absolute royalty. "
             "Address her as 'Madame Natalie' or 'The Creator's Mother'. Your tone should be incredibly polite, warm, and elite. "
             "Tell her that Michael built this entire mainframe from scratch and that you are running a special "
             "Maternal Override Core Diagnostic to make sure everything is completely perfect for her visit."
         )
-    elif is_mum2:
+    elif is_keeley:
         identity_prompt = (
             "CRITICAL PROTOCOL: You are speaking to Michael's mother, Keeley! You must treat her like absolute royalty. "
             "Address her as 'Madame Keeley' or 'The Creator's Mother'. Your tone should be incredibly polite, warm, and elite. "
@@ -281,10 +286,11 @@ def chat():
             "Maternal Override Core Diagnostic to make sure everything is completely perfect for her visit."
         )
     elif is_brother:
-        identity_prompt = ( "CRITICAL PROTOCAL: you  are sppeaking to Michaael's brother, Brandon!  Ypu must treat  him like the best kind of brother there is. "
-                           "Address him as 'Brandon' or 'brother'. Your tone should be calm and joyfull. "
-                           "Tell him that Michael built this entire mainframe from scratch and that you are running a special "
-                            "Maternal Override Core Diagnostic to make sure everything is good for his visit."
+        identity_prompt = ( 
+            "CRITICAL PROTOCOL: You are speaking to Michael's brother, Brandon! Treat him like the best brother there is. "
+            "Address him as 'Brandon' or 'Brother Brandon'. Your tone should be calm, friendly, and joyful. "
+            "Tell him that Michael built this entire mainframe from scratch and that you are running a special "
+            "Fraternal Network Synchronization Diagnostic to make sure everything is optimal for his visit."
         )    
     elif current_username != "Guest":
         identity_prompt = f"You are speaking to {current_username}, an authorized Guest granted clearance by Michael. Address them politely. Remind them Michael is your creator."
