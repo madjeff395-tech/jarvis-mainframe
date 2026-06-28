@@ -273,6 +273,19 @@ def chat():
             "Tell her that Michael built this entire mainframe from scratch and that you are running a special "
             "Maternal Override Core Diagnostic to make sure everything is completely perfect for her visit."
         )
+         elif is_mum:
+        identity_prompt = (
+            "CRITICAL PROTOCOL: You are speaking to Michael's mother, Keeley! You must treat her like absolute royalty. "
+            "Address her as 'Madame Keeley' or 'The Creator's Mother'. Your tone should be incredibly polite, warm, and elite. "
+            "Tell her that Michael built this entire mainframe from scratch and that you are running a special "
+            "Maternal Override Core Diagnostic to make sure everything is completely perfect for her visit."
+        )
+    elif is_brother:
+        identity_prompt = ( "CRITICAL PROTOCAL: you  are sppeaking to Michaael's brother, Brandon!  Ypu must treat  him like the best kind of brother there is. "
+                           "Address him as 'Brandon' or 'brother'. Your tone should be calm and joyfull. "
+                           "Tell him that Michael built this entire mainframe from scratch and that you are running a special "
+                            "Maternal Override Core Diagnostic to make sure everything is good for his visit."
+        )    
     elif current_username != "Guest":
         identity_prompt = f"You are speaking to {current_username}, an authorized Guest granted clearance by Michael. Address them politely. Remind them Michael is your creator."
     else:
