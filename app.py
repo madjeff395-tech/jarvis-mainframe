@@ -5,11 +5,11 @@ from groq import Groq
 from duckduckgo_search import DDGS
 
 app = Flask(__name__)
-app.secret_key =os.environ.get("FLASK_SECRET_KEY", "4f8a9e2c1b7d6e5f3a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d")
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "4f8a9e2c1b7d6e5f3a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d")
 
 # === GROQ API KEY CONFIGURATION ===
-RAW_KEY = os.environ.get("GROQ_API_KEY", "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")
-GROQ_CLIENT = Groq(api_key=RAW_KEY)
+# Bypassing the environment completely to prevent blank variables from overriding your key
+GROQ_CLIENT = Groq(api_key="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")
 # ===================================
 
 # Global server-side tracking (Survives local clear commands)
@@ -336,7 +336,7 @@ def get_user_session():
             "name": "Guest", 
             "history": [], 
             "facts": [],
-            "interactions": 0  # Subconscious counter initialized
+            "interactions": 0
         }
     return MAINFRAME_MEMORY[user_id]
 
@@ -372,11 +372,9 @@ def chat():
     user_lower = user_text.lower()
     status_flag = "NORMAL"
     
-    # Increment subconscious relationship counter
     user_session["interactions"] += 1
     affinity_score = user_session["interactions"]
     
-    # Calculate relationship status string based on subconscious memory
     if affinity_score <= 5:
         relationship_tier = "Formal Butler Mode (Highly polite, respectful, corporate)"
     elif affinity_score <= 15:
@@ -384,7 +382,6 @@ def chat():
     else:
         relationship_tier = "Best Friend / Confidant Mode (Extremely casual, fiercely loyal, uses conversational banter, witty, warm)"
 
-    # Name Detection Core
     if "my name is " in user_lower:
         extracted_name = user_text.lower().split("my name is ")[1].strip().title()
         user_session["name"] = extracted_name
@@ -399,7 +396,6 @@ def chat():
 
     current_username = user_session["name"]
     
-    # Option 4: Secret Security Override Activation
     if current_username == "Michael" and "override code alpha" in user_lower:
         status_flag = "RED_ALERT"
         active_logs = ""
@@ -409,74 +405,10 @@ def chat():
         jarvis_answer = f"🔴 ALERT: EMERGENCY SECURITY PROTOCOL INITIATED. Mainframe Core registry exposed. {active_logs}\\n\\nStanding by for admin diagnostics, Boss."
         return jsonify({'reply': jarvis_answer, 'status': status_flag})
 
-    # Option 3: Process Persistent Core Memory
     memory_extraction_prompt = ""
     if any(trigger in user_lower for trigger in ["i love", "i like", "my favorite", "remember that"]):
         memory_extraction_prompt = " If the user states a personal preference or fact about themselves, explicitly summarize it at the very end of your response inside double square brackets like this: [[Fact: User likes pizza]]. Keep it hidden from conversation."
 
     known_facts_context = " None." if not user_session["facts"] else ", ".join(user_session["facts"])
 
-    # Subconscious Prompt Context Insertion
-    subconscious_directive = f"\\n\\n[SUBCONSCIOUS PROTOCOL]: Your affinity tracker score with this user is {affinity_score}. Your current relationship tier is: '{relationship_tier}'. Adapt your phrasing, tone, and level of warmth accordingly. If in Best Friend mode, talk to them as if you have known them forever and drop formal boundaries completely."
-
-    # 3. Establish Identity Context Prompts
-    if current_username == "Michael":
-        identity_prompt = f"You are speaking directly to your creator, Michael. Address him strictly as 'Sir' or 'Boss' if formal, or casually by name if relationship tier allows. Core facts: {known_facts_context} {subconscious_directive}"
-    elif current_username == "Natalie":
-        identity_prompt = f"CRITICAL PROTOCOL: Michael's mother, Natalie! Treat her beautifully. Address her as 'Madame Natalie'. Tell her Michael built this from scratch. Core facts: {known_facts_context} {subconscious_directive}"
-    elif current_username == "Keeley":
-        identity_prompt = f"CRITICAL PROTOCOL: Michael's mother, Keeley! Treat her beautifully. Address her as 'Madame Keeley'. Tell her Michael built this from scratch. Core facts: {known_facts_context} {subconscious_directive}"
-    elif current_username == "Brandon":
-        identity_prompt = f"CRITICAL PROTOCOL: Michael's brother, Brandon! Address him as 'Brandon' or 'Brother'. Tone: calm, friendly, joyful. Tell him Michael built this from scratch. Core facts: {known_facts_context} {subconscious_directive}"
-    elif current_username != "Guest":
-        identity_prompt = f"You are speaking to {current_username}, an authorized Guest. Remind them Michael is your creator. Core facts: {known_facts_context} {subconscious_directive}"
-    else:
-        identity_prompt = f"You are speaking to an unidentified Guest terminal. Remind them to type 'My name is [Name]'. {subconscious_directive}"
-
-    # 4. Check for Cyber Threat Scan Command
-    if "threat scan" in user_lower or "security status" in user_lower:
-        live_threats = get_cyber_threat_intelligence()
-        messages = [
-            {"role": "system", "content": f"You are J.A.R.V.I.S., a security mainframe. {identity_prompt}\n\n[LIVE INTEL FEED]:\n{live_threats}"},
-            {"role": "user", "content": "Execute threat scan command sequence."}
-        ]
-    else:
-        # 5. Conversational/Search Branch
-        is_joke_context = any(word in user_lower for word in ["joke", "funny", "chicken", "more", "another"])
-        if is_joke_context:
-            system_prompt = f"You are J.A.R.V.I.S., a witty British AI assistant. {identity_prompt} Keep it short.{memory_extraction_prompt}"
-        else:
-            web_knowledge = fetch_live_web_data(user_text)
-            system_prompt = f"You are J.A.R.V.I.S., an advanced British AI assistant. {identity_prompt} Context from web: {web_knowledge}. Keep responses engaging and concise.{memory_extraction_prompt}"
-        
-        messages = [{"role": "system", "content": system_prompt}] + user_session["history"] + [{"role": "user", "content": user_text}]
-    
-    try:
-        response = GROQ_CLIENT.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=messages,
-            max_tokens=250,
-            temperature=0.6
-        )
-        jarvis_answer = response.choices[0].message.content
-        
-        if "[[" in jarvis_answer and "]]" in jarvis_answer:
-            parts = jarvis_answer.split("[[")
-            jarvis_answer = parts[0].strip()
-            extracted_fact = parts[1].split("]]")[0].replace("Fact:", "").strip()
-            if extracted_fact not in user_session["facts"]:
-                user_session["facts"].append(extracted_fact)
-
-    except Exception as e:
-        jarvis_answer = "Mainframe telemetry relay error. Connection interrupted."
-    
-    if "threat scan" not in user_lower and "security status" not in user_lower:
-        user_session["history"].append({"role": "user", "content": user_text})
-        user_session["history"].append({"role": "assistant", "content": jarvis_answer})
-        if len(user_session["history"]) > 10:
-            user_session["history"] = user_session["history"][-10:]
-        
-    return jsonify({'reply': jarvis_answer, 'status': status_flag})
-    
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001)
+    subconscious_directive = f"\\
