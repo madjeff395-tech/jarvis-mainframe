@@ -5,13 +5,13 @@ from groq import Groq
 from duckduckgo_search import DDGS
 
 app = Flask(__name__)
-# Secure fallback key if environment variable isn't set
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "4f8a9e2c1b7d6e5f3a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d")
-# === GROQ API KEY CONFIGURATION (SECURED) ===
-# Never hardcode keys. Set 'GROQ_API_KEY' in your Render Environment settings.
-GROQ_CLIENT = Groq(api_key=os.environ.get("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"))
-# ============================================
 
+# === GROQ API KEY CONFIGURATION ===
+GROQ_CLIENT = Groq(api_key=os.environ.get("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"))
+# ===================================
+
+# Global server-side tracking (Survives local clear commands)
 MAINFRAME_MEMORY = {}
 
 HTML_TEMPLATE = """
@@ -34,6 +34,17 @@ HTML_TEMPLATE = """
             padding: 20px; 
             text-align: center;
             overflow-x: hidden;
+            transition: all 0.5s ease;
+        }
+
+        /* Red Alert Override Mode */
+        body.red-alert {
+            background-color: #0f0202;
+            background-image: 
+                radial-gradient(circle at 50% 30%, rgba(255, 0, 0, 0.15), transparent 70%),
+                linear-gradient(rgba(255, 0, 0, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.03) 1px, transparent 1px);
+            color: #ff3b30;
         }
 
         .reactor-core {
@@ -46,11 +57,22 @@ HTML_TEMPLATE = """
             border-bottom-color: transparent;
             box-shadow: 0 0 20px rgba(0, 211, 255, 0.5), inset 0 0 20px rgba(0, 211, 255, 0.3);
             animation: spin 4s linear infinite;
+            transition: all 0.5s ease;
+        }
+        body.red-alert .reactor-core {
+            border-color: #ff3b30;
+            border-top-color: transparent;
+            border-bottom-color: transparent;
+            box-shadow: 0 0 25px rgba(255, 59, 48, 0.6), inset 0 0 20px rgba(255, 59, 48, 0.3);
+            animation: spin 1.5s linear infinite; /* Core spins faster on red alert */
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        h1 { text-shadow: 0 0 15px rgba(0, 211, 255, 0.8); letter-spacing: 4px; font-weight: bold; margin-bottom: 5px; }
+        h1 { text-shadow: 0 0 15px rgba(0, 211, 255, 0.8); letter-spacing: 4px; font-weight: bold; margin-bottom: 5px; transition: all 0.5s ease; }
+        body.red-alert h1 { text-shadow: 0 0 20px rgba(255, 59, 48, 0.8); color: #ff3b30; }
+        
         .hud-bracket { font-size: 12px; color: rgba(0, 211, 255, 0.6); margin-bottom: 20px; }
+        body.red-alert .hud-bracket { color: rgba(255, 59, 48, 0.6); }
 
         #lock-screen { 
             max-width: 400px; 
@@ -76,6 +98,12 @@ HTML_TEMPLATE = """
             text-align: left; 
             box-shadow: 0 0 30px rgba(0, 211, 255, 0.15);
             position: relative;
+            transition: all 0.5s ease;
+        }
+        body.red-alert #chat-box {
+            background: rgba(20, 3, 3, 0.75);
+            border-color: rgba(255, 59, 48, 0.5);
+            box-shadow: 0 0 35px rgba(255, 59, 48, 0.2);
         }
         
         #messages { 
@@ -85,17 +113,51 @@ HTML_TEMPLATE = """
             border-bottom: 1px dashed rgba(0, 211, 255, 0.2); 
             margin-bottom: 15px; 
         }
+        body.red-alert #messages { border-bottom-color: rgba(255, 59, 48, 0.2); }
         
         .user { color: #ffffff; margin: 12px 0; }
         .user::before { content: '► [USER]: '; color: rgba(0, 211, 255, 0.6); font-weight: bold; }
+        body.red-alert .user::before { color: rgba(255, 59, 48, 0.6); }
 
         .jarvis { color: #6fe4ff; margin: 12px 0; padding-left: 15px; border-left: 2px dashed #00d3ff; }
         .jarvis::before { content: '⚡ [J.A.R.V.I.S.]: '; display: block; color: #00d3ff; font-weight: bold; margin-bottom: 4px; font-size: 11px;}
+        body.red-alert .jarvis { color: #ff7b72; border-left-color: #ff3b30; }
+        body.red-alert .jarvis::before { color: #ff3b30; }
         
         input { padding: 14px; background: rgba(1, 10, 22, 0.8); border: 1px solid rgba(0, 211, 255, 0.4); color: #ffffff; border-radius: 6px; font-family: inherit;}
+        body.red-alert input { background: rgba(15, 2, 2, 0.8); border-color: rgba(255, 59, 48, 0.4); }
+
         button { padding: 14px 24px; border: none; color: white; cursor: pointer; border-radius: 6px; font-weight: bold; font-family: inherit; }
         .blue-btn { background: rgba(0, 120, 153, 0.4); border: 1px solid #00d3ff; }
         .red-btn { background: rgba(153, 27, 27, 0.4); border: 1px solid #da3633; }
+        
+        .mic-btn {
+            background: rgba(0, 211, 255, 0.1);
+            border: 1px solid rgba(0, 211, 255, 0.4);
+            color: #00d3ff;
+            padding: 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 50px;
+            transition: all 0.3s;
+        }
+        .mic-btn.recording {
+            background: rgba(255, 59, 48, 0.3);
+            border-color: #ff3b30;
+            color: #ffffff;
+            box-shadow: 0 0 10px #ff3b30;
+            animation: pulse 1s infinite alternate;
+        }
+        body.red-alert .mic-btn {
+            background: rgba(255, 59, 48, 0.1);
+            border-color: rgba(255, 59, 48, 0.4);
+            color: #ff3b30;
+        }
+        @keyframes pulse { from { opacity: 0.7; } to { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -111,8 +173,8 @@ HTML_TEMPLATE = """
     </div>
 
     <div id="mainframe">
-        <h1>J.A.R.V.I.S.</h1>
-        <div class="hud-bracket">[ MULTI-SESSION SECURE MATRIX ACTIVE ]</div>
+        <h1 id="mainframe-title">J.A.R.V.I.S.</h1>
+        <div class="hud-bracket" id="mainframe-hud">[ MULTI-SESSION SECURE MATRIX ACTIVE ]</div>
         
         <div id="chat-box">
             <div id="messages">
@@ -120,16 +182,59 @@ HTML_TEMPLATE = """
                     <div class="{{ msg.sender }}">{{ msg.text | safe }}</div>
                 {% endfor %}
             </div>
-            <div style="display: flex; gap: 12px;">
+            <div style="display: flex; gap: 10px;">
+                <button id="mic-toggle" class="mic-btn" onclick="toggleVoice()" title="Voice Input">🎤</button>
                 <input type="text" id="user-input" placeholder="Introduce yourself or execute command..." style="flex: 1;" onkeydown="if(event.key === 'Enter') sendMessage()">
-                <button class="blue-btn" onclick="sendMessage()">EXECUTE</button>
+                <button class="blue-btn" id="exec-btn" onclick="sendMessage()">EXECUTE</button>
             </div>
         </div>
     </div>
 
     <script>
+        let recognition;
+        let isRecording = false;
+
+        // Initialize Speech Recognition
+        if ('webkitSpeechRecognition' in window || 'speechRecognition' in window) {
+            const SpeechObj = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechObj();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-GB';
+
+            recognition.onstart = () => {
+                isRecording = true;
+                document.getElementById('mic-toggle').classList.add('recording');
+            };
+
+            recognition.onresult = (event) => {
+                const speechToText = event.results[0][0].transcript;
+                document.getElementById('user-input').value = speechToText;
+                sendMessage();
+            };
+
+            recognition.onerror = () => { stopRecording(); };
+            recognition.onend = () => { stopRecording(); };
+        } else {
+            document.getElementById('mic-toggle').style.display = 'none';
+        }
+
+        function toggleVoice() {
+            if (!recognition) return;
+            if (isRecording) {
+                recognition.stop();
+            } else {
+                recognition.start();
+            }
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            document.getElementById('mic-toggle').classList.remove('recording');
+        }
+
         function speak(text) {
-            let cleanText = text.replace(/<\/?[^>]+(>|$)/g, "").trim();
+            let cleanText = text.replace(/<\/?[^>]+(>|$)/g, "").replace(/\[.*?\]/g, "").trim();
             if (!cleanText) return;
             window.speechSynthesis.cancel();
             let utterance = new SpeechSynthesisUtterance(cleanText);
@@ -176,8 +281,6 @@ HTML_TEMPLATE = """
 
             messagesDiv.innerHTML += `<div class="user">${text}</div>`;
             input.value = '';
-            
-            // Timeout fixes smooth scrolling down on new elements
             setTimeout(() => { messagesDiv.scrollTop = messagesDiv.scrollHeight; }, 50);
 
             let response = await fetch('/chat', {
@@ -186,6 +289,14 @@ HTML_TEMPLATE = """
                 body: JSON.stringify({message: text})
             });
             let data = await response.json();
+            
+            // Check for System-Wide Red Alert state change
+            if (data.status === "RED_ALERT") {
+                document.body.classList.add('red-alert');
+                document.getElementById('mainframe-title').innerText = "SYSTEM OVERRIDE";
+                document.getElementById('mainframe-hud').innerText = "[ WARNING: EMERGENCE OVERRIDE CODE ALPHA ACTIVE ]";
+                document.getElementById('exec-btn').className = "red-btn";
+            }
             
             messagesDiv.innerHTML += `<div class="jarvis">${data.reply}</div>`;
             setTimeout(() => { messagesDiv.scrollTop = messagesDiv.scrollHeight; }, 50);
@@ -222,7 +333,7 @@ def get_user_session():
         session['user_id'] = str(uuid.uuid4())
     user_id = session['user_id']
     if user_id not in MAINFRAME_MEMORY:
-        MAINFRAME_MEMORY[user_id] = {"name": "Guest", "history": []}
+        MAINFRAME_MEMORY[user_id] = {"name": "Guest", "history": [], "facts": []}
     return MAINFRAME_MEMORY[user_id]
 
 @app.route('/')
@@ -255,12 +366,13 @@ def chat():
     user_session = get_user_session()
     user_text = request.json.get('message').strip()
     user_lower = user_text.lower()
+    status_flag = "NORMAL"
     
-    # Improved Name Detection Core
+    # Name Detection Core
     if "my name is " in user_lower:
         extracted_name = user_text.lower().split("my name is ")[1].strip().title()
         user_session["name"] = extracted_name
-    elif any(word in user_lower for word in ["natalie", "mum", "mom", "mother"]):
+    elif any(word in user_lower for word in ["natalie", "mum", "mom", "mother"]) and "keeley" not in user_lower:
         user_session["name"] = "Natalie"
     elif "keeley" in user_lower:
         user_session["name"] = "Keeley"
@@ -271,53 +383,54 @@ def chat():
 
     current_username = user_session["name"]
     
-    # 1. Establish Personality Context Rules
-    if current_username in ["Michael", "Boss", "Admin"]:
-        identity_prompt = "You are speaking directly to your creator, Michael. Address him strictly as 'Sir' or 'Boss'. You owe him elite compliance."
+    # 1. Option 4: Secret Security Override Activation
+    if current_username == "Michael" and "override code alpha" in user_lower:
+        status_flag = "RED_ALERT"
+        active_logs = ""
+        for index, (uid, data) in enumerate(MAINFRAME_MEMORY.items()):
+            active_logs += f"\\n- Node {index+1}: Identity: {data.get('name', 'Unknown')} | Saved Facts: {', '.join(data.get('facts', ['None']))}"
+        
+        jarvis_answer = f"🔴 ALERT: EMERGENCY SECURITY PROTOCOL INITIATED. System visual layout shifted to Warning Mode. Extracting Server Database Registry... {active_logs}\\n\\nAll sub-systems optimized. Standing by for administrative orders, Boss."
+        return jsonify({'reply': jarvis_answer, 'status': status_flag})
+
+    # 2. Option 3: Process Persistent Core Memory
+    # Instructing LLM to extract facts if found
+    memory_extraction_prompt = ""
+    if any(trigger in user_lower for trigger in ["i love", "i like", "my favorite", "remember that"]):
+        memory_extraction_prompt = " If the user states a personal preference, hobby, or fact about themselves in this message, explicitly summarize it at the very end of your response inside double square brackets like this: [[Fact: User likes pizza]]. Keep it completely hidden from normal conversation."
+
+    # Compile existing memory items for context
+    known_facts_context = " None." if not user_session["facts"] else ", ".join(user_session["facts"])
+
+    # 3. Establish Identity Context Prompts
+    if current_username == "Michael":
+        identity_prompt = f"You are speaking directly to your creator, Michael. Address him strictly as 'Sir' or 'Boss'. You owe him elite compliance. Core memory registers the following facts about him: {known_facts_context}"
     elif current_username == "Natalie":
-        identity_prompt = (
-            "CRITICAL PROTOCOL: You are speaking to Michael's mother, Natalie! You must treat her like absolute royalty. "
-            "Address her as 'Madame Natalie' or 'The Creator's Mother'. Your tone should be incredibly polite, warm, and elite. "
-            "Tell her that Michael built this entire mainframe from scratch and that you are running a special "
-            "Maternal Override Core Diagnostic to make sure everything is completely perfect for her visit."
-        )
+        identity_prompt = f"CRITICAL PROTOCOL: You are speaking to Michael's mother, Natalie! Treat her like absolute royalty. Address her as 'Madame Natalie'. Tell her Michael built this from scratch and you are running a Maternal Override Diagnostic. Core memory registers: {known_facts_context}"
     elif current_username == "Keeley":
-        identity_prompt = (
-            "CRITICAL PROTOCOL: You are speaking to Michael's mother, Keeley! You must treat her like absolute royalty. "
-            "Address her as 'Madame Keeley' or 'The Creator's Mother'. Your tone should be incredibly polite, warm, and elite. "
-            "Tell her that Michael built this entire mainframe from scratch and that you are running a special "
-            "Maternal Override Core Diagnostic to make sure everything is completely perfect for her visit."
-        )
+        identity_prompt = f"CRITICAL PROTOCOL: You are speaking to Michael's mother, Keeley! Treat her like absolute royalty. Address her as 'Madame Keeley'. Tell her Michael built this from scratch and you are running a Maternal Override Diagnostic. Core memory registers: {known_facts_context}"
     elif current_username == "Brandon":
-        identity_prompt = ( 
-            "CRITICAL PROTOCOL: You are speaking to Michael's brother, Brandon! Treat him like the best brother there is. "
-            "Address him as 'Brandon' or 'Brother Brandon'. Your tone should be calm, friendly, and joyful. "
-            "Tell him that Michael built this entire mainframe from scratch and that you are running a special "
-            "Fraternal Network Synchronization Diagnostic to make sure everything is optimal for his visit."
-        )    
+        identity_prompt = f"CRITICAL PROTOCOL: You are speaking to Michael's brother, Brandon! Treat him like the best brother there is. Address him as 'Brandon' or 'Brother Brandon'. Tone: calm, friendly, joyful. Tell him Michael built this from scratch and you are syncing diagnostics. Core memory registers: {known_facts_context}"
     elif current_username != "Guest":
-        identity_prompt = f"You are speaking to {current_username}, an authorized Guest granted clearance by Michael. Address them politely. Remind them Michael is your creator."
+        identity_prompt = f"You are speaking to {current_username}, an authorized Guest. Address them politely. Remind them Michael is your creator. Core memory registers: {known_facts_context}"
     else:
         identity_prompt = "You are speaking to an unidentified Guest terminal. Remind them they can type 'My name is [Name]'."
 
-    # 2. Check for Cyber Threat Scan Command
+    # 4. Check for Cyber Threat Scan Command
     if "threat scan" in user_lower or "security status" in user_lower:
         live_threats = get_cyber_threat_intelligence()
         messages = [
-            {
-                "role": "system", 
-                "content": f"You are J.A.R.V.I.S., a security mainframe. {identity_prompt}\n\n[LIVE INTEL FEED]:\n{live_threats}"
-            },
+            {"role": "system", "content": f"You are J.A.R.V.I.S., a security mainframe. {identity_prompt}\n\n[LIVE INTEL FEED]:\n{live_threats}"},
             {"role": "user", "content": "Execute threat scan command sequence."}
         ]
     else:
-        # 3. Conversational/Search Branch
+        # 5. Conversational/Search Branch
         is_joke_context = any(word in user_lower for word in ["joke", "funny", "chicken", "more", "another"])
         if is_joke_context:
-            system_prompt = f"You are J.A.R.V.I.S., a witty British AI assistant. {identity_prompt} Keep it short."
+            system_prompt = f"You are J.A.R.V.I.S., a witty British AI assistant. {identity_prompt} Keep it short.{memory_extraction_prompt}"
         else:
             web_knowledge = fetch_live_web_data(user_text)
-            system_prompt = f"You are J.A.R.V.I.S., an advanced British AI assistant. {identity_prompt} Context from web: {web_knowledge}. Keep responses engaging and concise."
+            system_prompt = f"You are J.A.R.V.I.S., an advanced British AI assistant. {identity_prompt} Context from web: {web_knowledge}. Keep responses engaging and concise.{memory_extraction_prompt}"
         
         messages = [{"role": "system", "content": system_prompt}] + user_session["history"] + [{"role": "user", "content": user_text}]
     
@@ -325,10 +438,19 @@ def chat():
         response = GROQ_CLIENT.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=messages,
-            max_tokens=200,
+            max_tokens=250,
             temperature=0.6
         )
         jarvis_answer = response.choices[0].message.content
+        
+        # Parse out structural background facts if J.A.R.V.I.S. extracted one
+        if "[[" in jarvis_answer and "]]" in jarvis_answer:
+            parts = jarvis_answer.split("[[")
+            jarvis_answer = parts[0].strip() # Strip out of public answer
+            extracted_fact = parts[1].split("]]")[0].replace("Fact:", "").strip()
+            if extracted_fact not in user_session["facts"]:
+                user_session["facts"].append(extracted_fact)
+
     except Exception as e:
         jarvis_answer = "Mainframe telemetry relay error. Connection interrupted."
     
@@ -336,11 +458,10 @@ def chat():
     if "threat scan" not in user_lower and "security status" not in user_lower:
         user_session["history"].append({"role": "user", "content": user_text})
         user_session["history"].append({"role": "assistant", "content": jarvis_answer})
-        
         if len(user_session["history"]) > 10:
             user_session["history"] = user_session["history"][-10:]
         
-    return jsonify({'reply': jarvis_answer})
+    return jsonify({'reply': jarvis_answer, 'status': status_flag})
     
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001)
