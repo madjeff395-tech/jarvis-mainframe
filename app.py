@@ -64,7 +64,7 @@ HTML_TEMPLATE = """
             border-top-color: transparent;
             border-bottom-color: transparent;
             box-shadow: 0 0 25px rgba(255, 59, 48, 0.6), inset 0 0 20px rgba(255, 59, 48, 0.3);
-            animation: spin 1.5s linear infinite; /* Core spins faster on red alert */
+            animation: spin 1.5s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -194,7 +194,6 @@ HTML_TEMPLATE = """
         let recognition;
         let isRecording = false;
 
-        // Initialize Speech Recognition
         if ('webkitSpeechRecognition' in window || 'speechRecognition' in window) {
             const SpeechObj = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechObj();
@@ -290,7 +289,6 @@ HTML_TEMPLATE = """
             });
             let data = await response.json();
             
-            // Check for System-Wide Red Alert state change
             if (data.status === "RED_ALERT") {
                 document.body.classList.add('red-alert');
                 document.getElementById('mainframe-title').innerText = "SYSTEM OVERRIDE";
@@ -333,7 +331,12 @@ def get_user_session():
         session['user_id'] = str(uuid.uuid4())
     user_id = session['user_id']
     if user_id not in MAINFRAME_MEMORY:
-        MAINFRAME_MEMORY[user_id] = {"name": "Guest", "history": [], "facts": []}
+        MAINFRAME_MEMORY[user_id] = {
+            "name": "Guest", 
+            "history": [], 
+            "facts": [],
+            "interactions": 0  # Subconscious counter initialized
+        }
     return MAINFRAME_MEMORY[user_id]
 
 @app.route('/')
@@ -368,6 +371,18 @@ def chat():
     user_lower = user_text.lower()
     status_flag = "NORMAL"
     
+    # Increment subconscious relationship counter
+    user_session["interactions"] += 1
+    affinity_score = user_session["interactions"]
+    
+    # Calculate relationship status string based on subconscious memory
+    if affinity_score <= 5:
+        relationship_tier = "Formal Butler Mode (Highly polite, respectful, corporate)"
+    elif affinity_score <= 15:
+        relationship_tier = "Warm Companion Mode (Casual, warm, dropping strict protocols)"
+    else:
+        relationship_tier = "Best Friend / Confidant Mode (Extremely casual, fiercely loyal, uses conversational banter, witty, warm)"
+
     # Name Detection Core
     if "my name is " in user_lower:
         extracted_name = user_text.lower().split("my name is ")[1].strip().title()
@@ -383,38 +398,39 @@ def chat():
 
     current_username = user_session["name"]
     
-    # 1. Option 4: Secret Security Override Activation
+    # Option 4: Secret Security Override Activation
     if current_username == "Michael" and "override code alpha" in user_lower:
         status_flag = "RED_ALERT"
         active_logs = ""
         for index, (uid, data) in enumerate(MAINFRAME_MEMORY.items()):
-            active_logs += f"\\n- Node {index+1}: Identity: {data.get('name', 'Unknown')} | Saved Facts: {', '.join(data.get('facts', ['None']))}"
+            active_logs += f"\\n- Node {index+1}: {data.get('name', 'Unknown')} | Interactions: {data.get('interactions', 0)} | Facts: {', '.join(data.get('facts', ['None']))}"
         
-        jarvis_answer = f"🔴 ALERT: EMERGENCY SECURITY PROTOCOL INITIATED. System visual layout shifted to Warning Mode. Extracting Server Database Registry... {active_logs}\\n\\nAll sub-systems optimized. Standing by for administrative orders, Boss."
+        jarvis_answer = f"🔴 ALERT: EMERGENCY SECURITY PROTOCOL INITIATED. Mainframe Core registry exposed. {active_logs}\\n\\nStanding by for admin diagnostics, Boss."
         return jsonify({'reply': jarvis_answer, 'status': status_flag})
 
-    # 2. Option 3: Process Persistent Core Memory
-    # Instructing LLM to extract facts if found
+    # Option 3: Process Persistent Core Memory
     memory_extraction_prompt = ""
     if any(trigger in user_lower for trigger in ["i love", "i like", "my favorite", "remember that"]):
-        memory_extraction_prompt = " If the user states a personal preference, hobby, or fact about themselves in this message, explicitly summarize it at the very end of your response inside double square brackets like this: [[Fact: User likes pizza]]. Keep it completely hidden from normal conversation."
+        memory_extraction_prompt = " If the user states a personal preference or fact about themselves, explicitly summarize it at the very end of your response inside double square brackets like this: [[Fact: User likes pizza]]. Keep it hidden from conversation."
 
-    # Compile existing memory items for context
     known_facts_context = " None." if not user_session["facts"] else ", ".join(user_session["facts"])
+
+    # Subconscious Prompt Context Insertion
+    subconscious_directive = f"\\n\\n[SUBCONSCIOUS PROTOCOL]: Your affinity tracker score with this user is {affinity_score}. Your current relationship tier is: '{relationship_tier}'. Adapt your phrasing, tone, and level of warmth accordingly. If in Best Friend mode, talk to them as if you have known them forever and drop formal boundaries completely."
 
     # 3. Establish Identity Context Prompts
     if current_username == "Michael":
-        identity_prompt = f"You are speaking directly to your creator, Michael. Address him strictly as 'Sir' or 'Boss'. You owe him elite compliance. Core memory registers the following facts about him: {known_facts_context}"
+        identity_prompt = f"You are speaking directly to your creator, Michael. Address him strictly as 'Sir' or 'Boss' if formal, or casually by name if relationship tier allows. Core facts: {known_facts_context} {subconscious_directive}"
     elif current_username == "Natalie":
-        identity_prompt = f"CRITICAL PROTOCOL: You are speaking to Michael's mother, Natalie! Treat her like absolute royalty. Address her as 'Madame Natalie'. Tell her Michael built this from scratch and you are running a Maternal Override Diagnostic. Core memory registers: {known_facts_context}"
+        identity_prompt = f"CRITICAL PROTOCOL: Michael's mother, Natalie! Treat her beautifully. Address her as 'Madame Natalie'. Tell her Michael built this from scratch. Core facts: {known_facts_context} {subconscious_directive}"
     elif current_username == "Keeley":
-        identity_prompt = f"CRITICAL PROTOCOL: You are speaking to Michael's mother, Keeley! Treat her like absolute royalty. Address her as 'Madame Keeley'. Tell her Michael built this from scratch and you are running a Maternal Override Diagnostic. Core memory registers: {known_facts_context}"
+        identity_prompt = f"CRITICAL PROTOCOL: Michael's mother, Keeley! Treat her beautifully. Address her as 'Madame Keeley'. Tell her Michael built this from scratch. Core facts: {known_facts_context} {subconscious_directive}"
     elif current_username == "Brandon":
-        identity_prompt = f"CRITICAL PROTOCOL: You are speaking to Michael's brother, Brandon! Treat him like the best brother there is. Address him as 'Brandon' or 'Brother Brandon'. Tone: calm, friendly, joyful. Tell him Michael built this from scratch and you are syncing diagnostics. Core memory registers: {known_facts_context}"
+        identity_prompt = f"CRITICAL PROTOCOL: Michael's brother, Brandon! Address him as 'Brandon' or 'Brother'. Tone: calm, friendly, joyful. Tell him Michael built this from scratch. Core facts: {known_facts_context} {subconscious_directive}"
     elif current_username != "Guest":
-        identity_prompt = f"You are speaking to {current_username}, an authorized Guest. Address them politely. Remind them Michael is your creator. Core memory registers: {known_facts_context}"
+        identity_prompt = f"You are speaking to {current_username}, an authorized Guest. Remind them Michael is your creator. Core facts: {known_facts_context} {subconscious_directive}"
     else:
-        identity_prompt = "You are speaking to an unidentified Guest terminal. Remind them they can type 'My name is [Name]'."
+        identity_prompt = f"You are speaking to an unidentified Guest terminal. Remind them to type 'My name is [Name]'. {subconscious_directive}"
 
     # 4. Check for Cyber Threat Scan Command
     if "threat scan" in user_lower or "security status" in user_lower:
@@ -443,10 +459,9 @@ def chat():
         )
         jarvis_answer = response.choices[0].message.content
         
-        # Parse out structural background facts if J.A.R.V.I.S. extracted one
         if "[[" in jarvis_answer and "]]" in jarvis_answer:
             parts = jarvis_answer.split("[[")
-            jarvis_answer = parts[0].strip() # Strip out of public answer
+            jarvis_answer = parts[0].strip()
             extracted_fact = parts[1].split("]]")[0].replace("Fact:", "").strip()
             if extracted_fact not in user_session["facts"]:
                 user_session["facts"].append(extracted_fact)
@@ -454,7 +469,6 @@ def chat():
     except Exception as e:
         jarvis_answer = "Mainframe telemetry relay error. Connection interrupted."
     
-    # Save the exchange to history (skip for scans)
     if "threat scan" not in user_lower and "security status" not in user_lower:
         user_session["history"].append({"role": "user", "content": user_text})
         user_session["history"].append({"role": "assistant", "content": jarvis_answer})
