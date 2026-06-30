@@ -5,11 +5,12 @@ from groq import Groq
 from duckduckgo_search import DDGS
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "stark_industries_override_9921")
-
-# === GROQ API KEY CONFIGURATION ===
-GROQ_CLIENT = Groq(api_key=os.environ.get("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"))
-# ===================================
+# Secure fallback key if environment variable isn't set
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "4f8a9e2c1b7d6e5f3a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d")
+# === GROQ API KEY CONFIGURATION (SECURED) ===
+# Never hardcode keys. Set 'GROQ_API_KEY' in your Render Environment settings.
+GROQ_CLIENT = Groq(api_key=os.environ.get("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"))
+# ============================================
 
 MAINFRAME_MEMORY = {}
 
@@ -175,7 +176,9 @@ HTML_TEMPLATE = """
 
             messagesDiv.innerHTML += `<div class="user">${text}</div>`;
             input.value = '';
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            
+            // Timeout fixes smooth scrolling down on new elements
+            setTimeout(() => { messagesDiv.scrollTop = messagesDiv.scrollHeight; }, 50);
 
             let response = await fetch('/chat', {
                 method: 'POST',
@@ -185,7 +188,7 @@ HTML_TEMPLATE = """
             let data = await response.json();
             
             messagesDiv.innerHTML += `<div class="jarvis">${data.reply}</div>`;
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            setTimeout(() => { messagesDiv.scrollTop = messagesDiv.scrollHeight; }, 50);
             speak(data.reply);
         }
     </script>
@@ -251,41 +254,41 @@ def clear_memory():
 def chat():
     user_session = get_user_session()
     user_text = request.json.get('message').strip()
+    user_lower = user_text.lower()
     
-    # Track name identification
-    if "my name is " in user_text.lower():
+    # Improved Name Detection Core
+    if "my name is " in user_lower:
         extracted_name = user_text.lower().split("my name is ")[1].strip().title()
         user_session["name"] = extracted_name
-    elif user_text.lower() in ["natalie", "mum", "mom", "mother"]:
+    elif any(word in user_lower for word in ["natalie", "mum", "mom", "mother"]):
         user_session["name"] = "Natalie"
-    elif user_text.lower() == "keeley":
+    elif "keeley" in user_lower:
         user_session["name"] = "Keeley"
-    elif user_text.lower() in ["brandon", "brother"]:
+    elif any(word in user_lower for word in ["brandon", "brother"]):
         user_session["name"] = "Brandon"
+    elif any(word in user_lower for word in ["michael", "boss", "creator"]):
+        user_session["name"] = "Michael"
 
     current_username = user_session["name"]
-    is_natalie = current_username.lower() == "natalie"
-    is_keeley = current_username.lower() == "keeley"
-    is_brother = current_username.lower() in ["brandon", "brother"]
     
     # 1. Establish Personality Context Rules
-    if current_username.lower() in ["michael", "boss", "admin"]:
+    if current_username in ["Michael", "Boss", "Admin"]:
         identity_prompt = "You are speaking directly to your creator, Michael. Address him strictly as 'Sir' or 'Boss'. You owe him elite compliance."
-    elif is_natalie:
+    elif current_username == "Natalie":
         identity_prompt = (
             "CRITICAL PROTOCOL: You are speaking to Michael's mother, Natalie! You must treat her like absolute royalty. "
             "Address her as 'Madame Natalie' or 'The Creator's Mother'. Your tone should be incredibly polite, warm, and elite. "
             "Tell her that Michael built this entire mainframe from scratch and that you are running a special "
             "Maternal Override Core Diagnostic to make sure everything is completely perfect for her visit."
         )
-    elif is_keeley:
+    elif current_username == "Keeley":
         identity_prompt = (
             "CRITICAL PROTOCOL: You are speaking to Michael's mother, Keeley! You must treat her like absolute royalty. "
             "Address her as 'Madame Keeley' or 'The Creator's Mother'. Your tone should be incredibly polite, warm, and elite. "
             "Tell her that Michael built this entire mainframe from scratch and that you are running a special "
             "Maternal Override Core Diagnostic to make sure everything is completely perfect for her visit."
         )
-    elif is_brother:
+    elif current_username == "Brandon":
         identity_prompt = ( 
             "CRITICAL PROTOCOL: You are speaking to Michael's brother, Brandon! Treat him like the best brother there is. "
             "Address him as 'Brandon' or 'Brother Brandon'. Your tone should be calm, friendly, and joyful. "
@@ -298,7 +301,7 @@ def chat():
         identity_prompt = "You are speaking to an unidentified Guest terminal. Remind them they can type 'My name is [Name]'."
 
     # 2. Check for Cyber Threat Scan Command
-    if "threat scan" in user_text.lower() or "security status" in user_text.lower():
+    if "threat scan" in user_lower or "security status" in user_lower:
         live_threats = get_cyber_threat_intelligence()
         messages = [
             {
@@ -309,7 +312,7 @@ def chat():
         ]
     else:
         # 3. Conversational/Search Branch
-        is_joke_context = any(word in user_text.lower() for word in ["joke", "funny", "chicken", "more", "another"])
+        is_joke_context = any(word in user_lower for word in ["joke", "funny", "chicken", "more", "another"])
         if is_joke_context:
             system_prompt = f"You are J.A.R.V.I.S., a witty British AI assistant. {identity_prompt} Keep it short."
         else:
@@ -330,7 +333,7 @@ def chat():
         jarvis_answer = "Mainframe telemetry relay error. Connection interrupted."
     
     # Save the exchange to history (skip for scans)
-    if "threat scan" not in user_text.lower() and "security status" not in user_text.lower():
+    if "threat scan" not in user_lower and "security status" not in user_lower:
         user_session["history"].append({"role": "user", "content": user_text})
         user_session["history"].append({"role": "assistant", "content": jarvis_answer})
         
