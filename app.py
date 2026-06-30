@@ -8,7 +8,8 @@ app = Flask(__name__)
 app.secret_key =os.environ.get("FLASK_SECRET_KEY", "4f8a9e2c1b7d6e5f3a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d")
 
 # === GROQ API KEY CONFIGURATION ===
-GROQ_CLIENT = Groq(api_key="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"))
+RAW_KEY = os.environ.get("GROQ_API_KEY", "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")
+GROQ_CLIENT = Groq(api_key=RAW_KEY)
 # ===================================
 
 # Global server-side tracking (Survives local clear commands)
