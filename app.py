@@ -306,6 +306,7 @@ HTML_TEMPLATE = """
 </html>
 """
 
+
 def fetch_live_web_data(query):
     try:
         search_results = []
