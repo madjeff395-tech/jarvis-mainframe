@@ -468,4 +468,7 @@ def chat():
     return jsonify({'reply': jarvis_answer, 'status': status_flag})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Render sets a PORT environment variable. If it doesn't exist, default to 5000.
+    port = int(os.environ.get("PORT", 5000))
+    # Bind to 0.0.0.0 so the app is accessible externally on the network
+    app.run(host='0.0.0.0', port=port, debug=False)
