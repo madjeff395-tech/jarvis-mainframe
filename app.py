@@ -404,7 +404,8 @@ def chat():
             facts_list = ', '.join(data.get('facts', ['None']))
             active_logs += f"\n- Node {index+1}: {data.get('name', 'Unknown')} | Interactions: {data.get('interactions', 0)} | Facts: {facts_list}"
         
-        jarvis_answer = f"🔴 ALERT: EMERGENCY SECURITY PROTOCOL INITIATED. Mainframe Core registry exposed. {active_logs}\n\nStanding by for admin diagnostics, Boss."
+        # FIXED STRING ASSEMBLY BELOW:
+        jarvis_answer = f"🔴 ALERT: EMERGENCY SECURITY PROTOCOL INITIATED.\nMainframe Core registry exposed.\n{active_logs}\n\nStanding by for admin diagnostics, Boss."
         return jsonify({'reply': jarvis_answer, 'status': status_flag})
 
     memory_extraction_prompt = ""
@@ -454,22 +455,4 @@ def chat():
         jarvis_answer = response.choices[0].message.content
         
         if "[[" in jarvis_answer and "]]" in jarvis_answer:
-            parts = jarvis_answer.split("[[")
-            jarvis_answer = parts[0].strip()
-            extracted_fact = parts[1].split("]]")[0].replace("Fact:", "").strip()
-            if extracted_fact not in user_session["facts"]:
-                user_session["facts"].append(extracted_fact)
-
-    except Exception as e:
-        jarvis_answer = "Mainframe telemetry relay error. Connection interrupted."
-    
-    if "threat scan" not in user_lower and "security status" not in user_lower:
-        user_session["history"].append({"role": "user", "content": user_text})
-        user_session["history"].append({"role": "assistant", "content": jarvis_answer})
-        if len(user_session["history"]) > 10:
-            user_session["history"] = user_session["history"][-10:]
-        
-    return jsonify({'reply': jarvis_answer, 'status': status_flag})
-    
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001)
+            parts = jarvis_answer.split("
