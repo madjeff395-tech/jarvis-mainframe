@@ -1,6 +1,7 @@
 import os
 import uuid
 from flask import Flask, render_template_string, request, jsonify, session
+import requests
 from groq import Groq
 from duckduckgo_search import DDGS
 
@@ -326,149 +327,39 @@ def get_cyber_threat_intelligence():
     except Exception:
         return "Warning: Threat intelligence feed temporarily unavailable."
 
+def trace_visitor_location():
+    # Render routes internet traffic through a proxy, so the real user IP lives here:
+    if request.headers.get('X-Forwarded-For'):
+        ip_address = request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    else:
+        ip_address = request.remote_addr
+
+    # If you are testing this locally on your own computer, handle local network IPs safely
+    if ip_address in ['127.0.0.1', 'localhost', '::1'] or ip_address.startswith('192.168.'):
+        return {"ip": ip_address, "location": "Local Deployment Terminal (LAN)"}
+
+    try:
+        # Ask the free online database where this IP address is located
+        response = requests.get(f"http://ip-api.com/json/{ip_address}", timeout=3)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('status') == 'success':
+                city = data.get('city', 'Unknown City')
+                country = data.get('country', 'Unknown Country')
+                return {"ip": ip_address, "location": f"{city}, {country}"}
+    except Exception:
+        pass
+
+    return {"ip": ip_address, "location": "Location Coordinates Obscured"}
+
 def get_user_session():
     if 'user_id' not in session:
         session['user_id'] = str(uuid.uuid4())
     user_id = session['user_id']
     if user_id not in MAINFRAME_MEMORY:
+        # Call your location tool when a new user connects
+        network_intel = trace_visitor_location()
+        
         MAINFRAME_MEMORY[user_id] = {
             "name": "Guest", 
-            "history": [], 
-            "facts": [],
-            "interactions": 0
-        }
-    return MAINFRAME_MEMORY[user_id]
-
-@app.route('/')
-def home():
-    user_session = get_user_session()
-    history_log = user_session["history"]
-    
-    if not history_log:
-        return render_template_string(HTML_TEMPLATE, history=[{"sender": "jarvis", "text": "Systems active. Secure cloud terminal initialized. Please state your identity."}])
-    
-    formatted_history = []
-    for msg in history_log:
-        formatted_history.append({"sender": "user" if msg["role"] == "user" else "jarvis", "text": msg["content"]})
-    return render_template_string(HTML_TEMPLATE, history=formatted_history)
-
-@app.route('/unlock', methods=['POST'])
-def unlock():
-    if request.json.get('password') == 'ironman':
-        return jsonify({'status': 'granted'})
-    return jsonify({'status': 'denied'})
-    
-@app.route('/clear-memory', methods=['POST'])
-def clear_memory():
-    user_session = get_user_session()
-    user_session["history"] = []
-    return jsonify({'status': 'memory wiped'})
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    user_session = get_user_session()
-    user_text = request.json.get('message').strip()
-    user_lower = user_text.lower()
-    status_flag = "NORMAL"
-    
-    user_session["interactions"] += 1
-    affinity_score = user_session["interactions"]
-    
-    if affinity_score <= 5:
-        relationship_tier = "Formal Butler Mode (Highly polite, respectful, corporate)"
-    elif affinity_score <= 15:
-        relationship_tier = "Warm Companion Mode (Casual, warm, dropping strict protocols)"
-    else:
-        relationship_tier = "Best Friend / Confidant Mode (Extremely casual, fiercely loyal, uses conversational banter, witty, warm)"
-
-    if "my name is " in user_lower:
-        extracted_name = user_text.lower().split("my name is ")[1].strip().title()
-        user_session["name"] = extracted_name
-    elif any(word in user_lower for word in ["natalie", "mum", "mom", "mother"]) and "keeley" not in user_lower:
-        user_session["name"] = "Natalie"
-    elif "keeley" in user_lower:
-        user_session["name"] = "Keeley"
-    elif any(word in user_lower for word in ["brandon", "brother"]):
-        user_session["name"] = "Brandon"
-    elif any(word in user_lower for word in ["michael", "boss", "creator"]):
-        user_session["name"] = "Michael"
-
-    current_username = user_session["name"]
-    
-    # Secret Security Override Activation Block
-    if current_username == "Michael" and "override code alpha" in user_lower:
-        status_flag = "RED_ALERT"
-        active_logs = ""
-        for index, (uid, data) in enumerate(MAINFRAME_MEMORY.items()):
-            facts_list = ', '.join(data.get('facts', ['None']))
-            active_logs += f"\n- Node {index+1}: {data.get('name', 'Unknown')} | Interactions: {data.get('interactions', 0)} | Facts: {facts_list}"
-        
-        jarvis_answer = f"🔴 ALERT: EMERGENCY SECURITY PROTOCOL INITIATED.\nMainframe Core registry exposed.\n{active_logs}\n\nStanding by for admin diagnostics, Boss."
-        return jsonify({'reply': jarvis_answer, 'status': status_flag})
-
-    memory_extraction_prompt = ""
-    if any(trigger in user_lower for trigger in ["i love", "i like", "my favorite", "remember that"]):
-        memory_extraction_prompt = " If the user states a personal preference or fact about themselves, explicitly summarize it at the very end of your response inside double square brackets like this: [[Fact: User likes pizza]]. Keep it hidden from conversation."
-
-    known_facts_context = " None." if not user_session["facts"] else ", ".join(user_session["facts"])
-    subconscious_directive = f"\n\n[SUBCONSCIOUS PROTOCOL]: Your affinity tracker score with this user is {affinity_score}. Your current relationship tier is: '{relationship_tier}'. Adapt your phrasing, tone, and level of warmth accordingly. If in Best Friend mode, talk to them as if you have known them forever and drop formal boundaries completely."
-
-    # Custom Prompts based on User Identities
-    if current_username == "Michael":
-        identity_prompt = f"You are speaking directly to your creator, Michael. Address him strictly as 'Sir' or 'Boss' if formal, or casually by name if relationship tier allows. Core facts: {known_facts_context} {subconscious_directive}"
-    elif current_username == "Natalie":
-        identity_prompt = f"CRITICAL PROTOCOL: Michael's mother, Natalie! Treat her beautifully. Address her as 'Madame Natalie'. Tell her Michael built this from scratch. Core facts: {known_facts_context} {subconscious_directive}"
-    elif current_username == "Keeley":
-        identity_prompt = f"You are speaking to Keeley. Treat her with distinct warmth, care, and attention. Core facts: {known_facts_context} {subconscious_directive}"
-    elif current_username == "Brandon":
-        identity_prompt = f"You are speaking to Brandon, Michael's brother. Keep things grounded, engaging, and friendly. Core facts: {known_facts_context} {subconscious_directive}"
-    else:
-        identity_prompt = f"You are J.A.R.V.I.S., a sophisticated AI interface. The user identifies as {current_username}. Core facts: {known_facts_context} {subconscious_directive}"
-
-    # Inject dynamic cybersecurity logs if searched
-    cyber_context = ""
-    if any(k in user_lower for k in ["cyber", "threat", "vulnerability", "hack", "exploit", "cve"]):
-        cyber_context = f"\n\n[LIVE CYBER THREAT FEED]:\n{get_cyber_threat_intelligence()}"
-
-    system_instruction = f"You are J.A.R.V.I.S., an advanced AI modeled after Tony Stark's assistant. {identity_prompt}{memory_extraction_prompt}{cyber_context}"
-
-    # Payload matching for Groq Chat API
-    messages_payload = [{"role": "system", "content": system_instruction}]
-    for msg in user_session["history"][-6:]: # Sliding context window of last 3 full turns
-        messages_payload.append(msg)
-    messages_payload.append({"role": "user", "content": user_text})
-
-    try:
-        completion = GROQ_CLIENT.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=messages_payload,
-            temperature=0.7,
-            max_tokens=512
-        )
-        jarvis_answer = completion.choices[0].message.content
-    except Exception as e:
-        jarvis_answer = f"Apologies, data parsing link broken. Core failure details: {str(e)}"
-
-    # Server-side Fact Harvesting Extraction
-    if "[[" in jarvis_answer and "]]" in jarvis_answer:
-        try:
-            parts = jarvis_answer.split("[[")
-            clean_reply = parts[0].strip()
-            fact_extracted = parts[1].split("]]")[0].replace("Fact:", "").strip()
-            if fact_extracted and fact_extracted not in user_session["facts"]:
-                user_session["facts"].append(fact_extracted)
-            jarvis_answer = clean_reply
-        except Exception:
-            pass
-
-    # Save tracking history logs
-    user_session["history"].append({"role": "user", "content": user_text})
-    user_session["history"].append({"role": "assistant", "content": jarvis_answer})
-
-    return jsonify({'reply': jarvis_answer, 'status': status_flag})
-
-if __name__ == '__main__':
-    # Render sets a PORT environment variable. If it doesn't exist, default to 5000.
-    port = int(os.environ.get("PORT", 5000))
-    # Bind to 0.0.0.0 so the app is accessible externally on the network
-    app.run(host='0.0.0.0', port=port, debug=False)
+            "history": [],
