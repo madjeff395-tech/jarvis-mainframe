@@ -1,0 +1,4 @@
+flask
+groq
+duckduckgo_search
+requests
