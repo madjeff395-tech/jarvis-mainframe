@@ -15,7 +15,7 @@ GROQ_CLIENT = Groq(api_key="gsk_nEYs5nyXjWd2wxTMRaVnWGdyb3FY5u4AzMsjJjWXU60bWZdG
 # Global server-side tracking (Survives local clear commands)
 MAINFRAME_MEMORY = {}
 
-HTML_TEMPLATE = """
+HTML_TEMPLATE = r"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
